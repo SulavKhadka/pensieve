@@ -1,11 +1,11 @@
 from fastapi import FastAPI, WebSocket, Request
 from fastapi.responses import HTMLResponse
-from whisper_streaming.whisper_online import *
+from whisper_streamer.whisper_online import *
 import numpy as np
 import time
 import openai
 from fastapi.middleware.cors import CORSMiddleware
-from SECRET_KEYS import OPENROUTER_KEY
+from secret_keys import OPENROUTER_KEY
 
 app = FastAPI()
 
