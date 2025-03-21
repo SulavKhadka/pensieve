@@ -1,17 +1,37 @@
-from fastapi import FastAPI, WebSocket
+from fastapi import FastAPI, WebSocket, Request
 from fastapi.responses import HTMLResponse
-from faster_whisper import WhisperModel
+from whisper_streaming.whisper_online import *
 import numpy as np
-from pydub import AudioSegment
-import io
+import time
+import openai
+from fastapi.middleware.cors import CORSMiddleware
+from SECRET_KEYS import OPENROUTER_KEY
 
 app = FastAPI()
 
-model_size = "distil-large-v2"
-model = WhisperModel(model_size, device="cuda", compute_type="float16")
+# Add CORS middleware
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],  # Allows all origins
+    allow_credentials=True,
+    allow_methods=["*"],  # Allows all methods
+    allow_headers=["*"],  # Allows all headers
+)
+
+log_file = open("log.txt", "w")
+model_size = "distil-large-v3"
+asr = FasterWhisperASR("en", model_size, logfile=log_file) 
+online = VACOnlineASRProcessor(online_chunk_size=0.5, asr=asr) 
+
 sample_rate = 16000
 chunk_ms = 500
-capture_duration_secs = 5
+capture_duration_secs = 0.5
+
+
+llm_client = openai.OpenAI(
+    base_url="https://openrouter.ai/api/v1",
+    api_key=OPENROUTER_KEY
+)
 
 html = """
 <!DOCTYPE html>
@@ -23,38 +43,46 @@ html = """
         <h1>WebSocket Audio Streaming</h1>
         <button id="startButton">Start Streaming</button>
         <button id="stopButton" disabled>Stop Streaming</button>
-        <ul id='messages'></ul>
+        <p id='transcript'></p>
+        <button id="saveButton">Save Transcript</button>
+        <button id="generateReportButton">Generate Report</button>
+        <br>
+        <textarea id="reportTextArea" rows="10" cols="50" readonly></textarea>
         <script>
             let ws;
-            let mediaRecorder;
-            let audioChunks = [];
+            let audioContext;
+            let source;
+            let processor;
+            let stream;
             const startButton = document.getElementById('startButton');
             const stopButton = document.getElementById('stopButton');
+            const saveButton = document.getElementById('saveButton');
+            const generateReportButton = document.getElementById('generateReportButton');
 
             startButton.onclick = startStreaming;
             stopButton.onclick = stopStreaming;
+            saveButton.onclick = saveTranscript;
+            generateReportButton.onclick = generateReport;
 
             function startStreaming() {
                 ws = new WebSocket("ws://localhost:8000/ws");
                 ws.onmessage = function(event) {
-                    var messages = document.getElementById('messages')
-                    var message = document.createElement('li')
-                    var content = document.createTextNode(event.data)
-                    message.appendChild(content)
-                    messages.appendChild(message)
+                    var transcript = document.getElementById('transcript');
+                    var content = document.createTextNode(event.data);
+                    transcript.appendChild(content);
                 };
 
                 navigator.mediaDevices.getUserMedia({ audio: true })
-                    .then(stream => {
-                        // Create audio context with lower sample rate (most browsers use 44100Hz or 48000Hz by default)
-                        const audioContext = new AudioContext();
-                        const source = audioContext.createMediaStreamSource(stream);
+                    .then(streamObj => {
+                        stream = streamObj;
+                        // Create audio context with lower sample rate
+                        audioContext = new AudioContext();
+                        source = audioContext.createMediaStreamSource(stream);
                         
                         // Create processor with desired chunk size (4096 samples)
-                        const processor = audioContext.createScriptProcessor(4096, 1, 1);
+                        processor = audioContext.createScriptProcessor(4096, 1, 1);
                         
                         // Create a resampler to convert to 16000Hz
-                        // We need to use a resampler because browsers typically don't support 16000Hz directly
                         const resampleRatio = 16000 / audioContext.sampleRate;
                         
                         source.connect(processor);
@@ -64,7 +92,7 @@ html = """
                             // Get original audio data
                             const inputData = e.inputBuffer.getChannelData(0);
                             
-                            // Perform simple resampling (more sophisticated resampling might be needed for production)
+                            // Perform simple resampling
                             const resampledLength = Math.floor(inputData.length * resampleRatio);
                             const resampledData = new Float32Array(resampledLength);
                             
@@ -88,11 +116,71 @@ html = """
                 stopButton.disabled = false;
             }
 
+            function saveTranscript() {
+                const transcript = document.getElementById('transcript').textContent;
+                const blob = new Blob([transcript], { type: 'text/plain' });
+                const url = URL.createObjectURL(blob);
+                const a = document.createElement('a');
+                a.href = url;
+                a.download = 'transcript.txt';
+                a.click();
+                URL.revokeObjectURL(url);
+            }
+
+            function generateReport() {
+                const transcript = document.getElementById('transcript').textContent;
+                report = fetch("http://localhost:8000/generate_report", {
+                    method: "POST",
+                    headers: {
+                        "Content-Type": "application/json",
+                    },
+                    body: JSON.stringify({
+                        transcript: transcript
+                    })
+                })
+                .then(response => response.json())
+                .then(data => {
+                    const reportTextArea = document.getElementById('reportTextArea');
+                    reportTextArea.value = data.report;
+                    reportTextArea.rows = 10;
+                    reportTextArea.cols = 50;
+                    reportTextArea.readOnly = true;
+                })
+            }
+
             function stopStreaming() {
-                mediaRecorder.stop();
-                ws.close();
+                // Disconnect the audio processing pipeline
+                if (processor && source) {
+                    processor.disconnect();
+                    source.disconnect();
+                }
+                
+                // Close the AudioContext
+                if (audioContext) {
+                    // Modern browsers require closing the AudioContext
+                    if (audioContext.state !== 'closed' && typeof audioContext.close === 'function') {
+                        audioContext.close();
+                    }
+                }
+                
+                // Stop all audio tracks
+                if (stream) {
+                    stream.getTracks().forEach(track => track.stop());
+                }
+                
+                // Close the WebSocket connection
+                if (ws && ws.readyState === WebSocket.OPEN) {
+                    ws.close();
+                }
+                
+                // Reset UI
                 startButton.disabled = false;
                 stopButton.disabled = true;
+                
+                // Optional: clear the transcript or add a separator
+                let separator_dashed_line = document.createElement('hr');
+                separator_dashed_line.style.borderTop = '1px dashed #000';
+                document.getElementById('transcript').appendChild(separator_dashed_line);
             }
         </script>
     </body>
@@ -105,6 +193,18 @@ async def get():
     return HTMLResponse(html)
 
 
+@app.post("/generate_report")
+async def generate_report(request: Request):
+    transcript_data = await request.json()
+    response = llm_client.chat.completions.create(
+        model="google/gemini-2.0-flash-001",
+        messages=[
+            {"role": "system", "content": "Your job is to take this transcript and organize the thoughts into a report."},
+            {"role": "user", "content": transcript_data["transcript"]}
+        ]
+    )
+    return {"report": response.choices[0].message.content}
+
 @app.websocket("/ws")
 async def websocket_endpoint(websocket: WebSocket):
     await websocket.accept()
@@ -113,8 +213,7 @@ async def websocket_endpoint(websocket: WebSocket):
     # Buffer to accumulate audio samples
     audio_buffer = np.array([], dtype=np.float32)
     
-    # How many samples constitute 5 seconds of audio
-    samples_for_5sec = 2 * sample_rate
+    samples_per_chunk = capture_duration_secs * sample_rate
     
     while True:
         try:
@@ -123,25 +222,21 @@ async def websocket_endpoint(websocket: WebSocket):
                 continue
                 
             chunk = np.frombuffer(data, dtype=np.float32)
-            
+            online.insert_audio_chunk(chunk)
             # Add to buffer
             audio_buffer = np.append(audio_buffer, chunk)
             
             # Process if we have enough data
-            if len(audio_buffer) >= samples_for_5sec:
+            if len(audio_buffer) >= samples_per_chunk:
                 # Transcribe
-                segments, info = model.transcribe(audio_buffer, beam_size=5, language="en")
-                
-                # Get transcription text\
-                for segment in segments:
-                    print(segment)
-                transcription = " ".join([segment.text for segment in segments])
-                
-                if transcription.strip():
-                    await websocket.send_text(transcription)
-                
-                # Reset buffer (optionally keep some overlap)
-                audio_buffer = audio_buffer[samples_for_5sec:]
+                time_start = time.time()
+                st, end, text = online.process_iter()
+                time_end = time.time()
+                if text != "":
+                    await websocket.send_text(text)
+                print(f"the latency is {time_end-time_start:.2f}")
+
+                audio_buffer = np.array([], dtype=np.float32)
                 
         except Exception as e:
             print(f"WebSocket error: {e}")
