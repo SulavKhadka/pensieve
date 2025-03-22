@@ -6,6 +6,12 @@ import time
 import openai
 from fastapi.middleware.cors import CORSMiddleware
 from secret_keys import OPENROUTER_KEY
+from report_generator import generate_report_from_outline, outline_report
+
+llm_client = openai.OpenAI(
+    base_url="https://openrouter.ai/api/v1",
+    api_key=OPENROUTER_KEY
+)
 
 app = FastAPI()
 
@@ -188,22 +194,35 @@ html = """
 """
 
 
-@app.get("/")
+@app.get("/old_home")
 async def get():
     return HTMLResponse(html)
+
+@app.get("/", response_class=HTMLResponse)
+async def get_html():
+    try:
+        with open("index.html", "r") as file:
+            return file.read()
+    except FileNotFoundError:
+        # If file doesn't exist, serve the embedded HTML
+        with open("index.html", "w") as file:
+            html_content = """
+            <!DOCTYPE html>
+            <html>
+            <head>...</head>
+            <body>...</body>
+            </html>
+            """  # This would be the full HTML from the artifact
+            file.write(html_content)
+            return html_content
 
 
 @app.post("/generate_report")
 async def generate_report(request: Request):
     transcript_data = await request.json()
-    response = llm_client.chat.completions.create(
-        model="google/gemini-2.0-flash-001",
-        messages=[
-            {"role": "system", "content": "Your job is to take this transcript and organize the thoughts into a report."},
-            {"role": "user", "content": transcript_data["transcript"]}
-        ]
-    )
-    return {"report": response.choices[0].message.content}
+    outline = outline_report(llm_client, transcript_data["transcript"])
+    report = generate_report_from_outline(llm_client, transcript_data["transcript"], outline["outline"])
+    return report
 
 @app.websocket("/ws")
 async def websocket_endpoint(websocket: WebSocket):
