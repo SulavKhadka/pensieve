@@ -351,10 +351,19 @@ async function generateReport() {
         reportContent.innerHTML = marked.parse(report.report);
         showToast('Report generated successfully', 'success');
         
+        // Enable copy and download buttons
+        copyReportButton.disabled = false;
+        downloadReportButton.disabled = false;
+        
     } catch (error) {
         console.error('Error generating report:', error);
         reportContent.innerHTML = 'Error generating report. Please try again.';
         showToast('Failed to generate report', 'error');
+
+        // Disable copy and download buttons
+        copyReportButton.disabled = true;
+        downloadReportButton.disabled = true;
+        
     } finally {
         // Reset button state
         generateReportButton.disabled = false;
@@ -489,6 +498,8 @@ loadSettings();
 
 // Initialize UI state
 generateReportButton.disabled = true; // Initially disable report button until outline is generated
+copyReportButton.disabled = true; // Initially disable copy button until report is generated
+downloadReportButton.disabled = true; // Initially disable download button until report is generated
 
 // Event Listeners
 startButton.addEventListener('click', startStreaming);
