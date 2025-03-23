@@ -1,5 +1,7 @@
 from fastapi import FastAPI, WebSocket, Request
 from fastapi.responses import HTMLResponse
+from fastapi.staticfiles import StaticFiles
+from fastapi.templating import Jinja2Templates
 from whisper_streamer.whisper_online import *
 import numpy as np
 import time
@@ -14,6 +16,9 @@ llm_client = openai.OpenAI(
 )
 
 app = FastAPI()
+
+# Mount static files directory
+app.mount("/static", StaticFiles(directory="static"), name="static")
 
 # Add CORS middleware
 app.add_middleware(
@@ -217,11 +222,16 @@ async def get_html():
             return html_content
 
 
+@app.post("/generate_outline")
+async def generate_outline(request: Request):
+    transcript_data = await request.json()
+    outline = outline_report(llm_client, transcript_data["transcript"])
+    return outline
+
 @app.post("/generate_report")
 async def generate_report(request: Request):
     transcript_data = await request.json()
-    outline = outline_report(llm_client, transcript_data["transcript"])
-    report = generate_report_from_outline(llm_client, transcript_data["transcript"], outline["outline"])
+    report = generate_report_from_outline(llm_client, transcript_data["transcript"], transcript_data["outline"])
     return report
 
 @app.websocket("/ws")
