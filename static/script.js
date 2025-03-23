@@ -14,9 +14,12 @@ const toast = document.getElementById('toast');
 const toastMessage = document.getElementById('toastMessage');
 const transcript = document.getElementById('transcript');
 const reportContent = document.getElementById('reportContent');
+const outlineContent = document.getElementById('outlineContent');
 const recordingIndicator = document.getElementById('recordingIndicator');
 const visualizerBars = document.getElementById('visualizerBars');
 const reportTypeOptions = document.querySelectorAll('.report-type-option');
+const tabs = document.querySelectorAll('.tab');
+const tabContents = document.querySelectorAll('.tab-content');
 
 // App State
 let ws;
@@ -272,6 +275,20 @@ function saveTranscript() {
     showToast('Transcript saved', 'success');
 }
 
+// Tab handling
+tabs.forEach(tab => {
+    tab.addEventListener('click', () => {
+        // Remove active class from all tabs and contents
+        tabs.forEach(t => t.classList.remove('active'));
+        tabContents.forEach(c => c.classList.remove('active'));
+        
+        // Add active class to clicked tab and corresponding content
+        tab.classList.add('active');
+        const content = document.querySelector(`.tab-content[data-content="${tab.dataset.tab}"]`);
+        content.classList.add('active');
+    });
+});
+
 // Generate report
 async function generateReport() {
     const text = transcript.innerText;
@@ -284,6 +301,7 @@ async function generateReport() {
     generateReportButton.disabled = true;
     generateReportButton.innerHTML = '<div class="spinner"></div>';
     reportContent.innerHTML = 'Generating outline...';
+    outlineContent.innerHTML = '';
     
     try {
         // First generate the outline
@@ -302,6 +320,7 @@ async function generateReport() {
         }
         
         const outline = await outlineResponse.json();
+        outlineContent.innerHTML = marked.parse(outline.outline);
         reportContent.innerHTML = 'Generating final report...';
         
         // Then generate the report using the outline
@@ -327,6 +346,7 @@ async function generateReport() {
     } catch (error) {
         console.error('Error generating report:', error);
         reportContent.innerHTML = 'Error generating report. Please try again.';
+        outlineContent.innerHTML = '';
         showToast('Failed to generate report', 'error');
     } finally {
         // Reset button state

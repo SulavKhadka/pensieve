@@ -100,21 +100,17 @@
                             <polyline points="10 9 9 9 8 9"></polyline>
                         </svg>
                         Generated Report
-                        <div class="tooltip">
-                            <span class="tooltip-icon">ⓘ</span>
-                            <span class="tooltip-text">The report will be generated based on your transcription. Choose a report type before generating.</span>
-                        </div>
                     </h2>
                 </div>
 
-                <div class="report-type-selector">
-                    <div class="report-type-option active" data-type="summary">Summary</div>
-                    <div class="report-type-option" data-type="detailed">Detailed</div>
-                    <div class="report-type-option" data-type="actionItems">Action Items</div>
+                <div class="report-tabs">
+                    <div class="tab active" data-tab="report">Report</div>
+                    <div class="tab" data-tab="outline">Outline</div>
                 </div>
 
                 <div class="content-area">
-                    <div id="reportContent" class="markdown-content"></div>
+                    <div id="reportContent" class="markdown-content tab-content active" data-content="report"></div>
+                    <div id="outlineContent" class="markdown-content tab-content" data-content="outline"></div>
                 </div>
 
                 <div class="bottom-controls">
