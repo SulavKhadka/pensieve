@@ -104,17 +104,25 @@
                 </div>
 
                 <div class="report-tabs">
-                    <div class="tab active" data-tab="report">Report</div>
-                    <div class="tab" data-tab="outline">Outline</div>
+                    <div class="tab active" data-tab="outline">Outline</div>
+                    <div class="tab" data-tab="report">Report</div>
                 </div>
 
                 <div class="content-area">
-                    <div id="reportContent" class="markdown-content tab-content active" data-content="report"></div>
-                    <div id="outlineContent" class="markdown-content tab-content" data-content="outline"></div>
+                    <div id="outlineContent" class="markdown-content tab-content active" data-content="outline"></div>
+                    <div id="reportContent" class="markdown-content tab-content" data-content="report"></div>
                 </div>
 
                 <div class="bottom-controls">
                     <div class="control-group">
+                        <button id="generateOutlineButton" class="btn btn-secondary">
+                            <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                                <circle cx="12" cy="12" r="10"></circle>
+                                <line x1="12" y1="8" x2="12" y2="16"></line>
+                                <line x1="8" y1="12" x2="16" y2="12"></line>
+                            </svg>
+                            Generate Outline
+                        </button>
                         <button id="generateReportButton" class="btn btn-secondary">
                             <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
                                 <circle cx="12" cy="12" r="10"></circle>
