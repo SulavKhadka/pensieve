@@ -1,7 +1,6 @@
 from fastapi import FastAPI, WebSocket, Request
 from fastapi.responses import HTMLResponse
 from fastapi.staticfiles import StaticFiles
-from fastapi.templating import Jinja2Templates
 from whisper_streamer.whisper_online import *
 import numpy as np
 import time
@@ -9,6 +8,65 @@ import openai
 from fastapi.middleware.cors import CORSMiddleware
 from secret_keys import OPENROUTER_KEY
 from report_generator import generate_report_from_outline, outline_report
+import os
+import base64
+import secrets
+from starlette.middleware.base import BaseHTTPMiddleware
+from starlette.responses import Response
+from starlette.status import HTTP_401_UNAUTHORIZED
+
+# Authentication configuration
+# These should be set as environment variables in production
+APP_USERNAME = os.environ.get("APP_USERNAME", "user")
+APP_PASSWORD = os.environ.get("APP_PASSWORD", secrets.token_urlsafe(16))  # Generates a secure random password if not set
+
+# If password is auto-generated, print it to console (for development only)
+if os.environ.get("APP_PASSWORD") is None:
+    print("====== SECURITY NOTICE ======")
+    print("Auto-generated credentials for application access:")
+    print(f"Username: {APP_USERNAME}")
+    print(f"Password: {APP_PASSWORD}")
+    print("Set APP_USERNAME and APP_PASSWORD environment variables to use custom credentials.")
+    print("==============================")
+
+# Custom middleware for HTTP Basic Authentication
+class BasicAuthMiddleware(BaseHTTPMiddleware):
+    async def dispatch(self, request: Request, call_next):
+        # Check if the Authorization header is present
+        auth_header = request.headers.get("Authorization")
+        
+        if auth_header:
+            try:
+                # Parse the Authorization header
+                auth_type, auth_credentials = auth_header.split(" ", 1)
+                if auth_type.lower() == "basic":
+                    # Decode the Base64-encoded credentials
+                    decoded_credentials = base64.b64decode(auth_credentials).decode("utf-8")
+                    username, password = decoded_credentials.split(":", 1)
+                    
+                    # Check if credentials match
+                    if secrets.compare_digest(username, APP_USERNAME) and secrets.compare_digest(password, APP_PASSWORD):
+                        # Credentials match, allow the request to proceed
+                        return await call_next(request)
+            except Exception:
+                # Any exception during auth processing results in auth failure
+                pass
+        
+        # If we reach here, authentication failed or was not provided
+        # Return 401 Unauthorized with WWW-Authenticate header to prompt for credentials
+        headers = {"WWW-Authenticate": "Basic"}
+        
+        # Check if this is a WebSocket upgrade request
+        if "upgrade" in request.headers.get("connection", "").lower() and request.headers.get("upgrade", "").lower() == "websocket":
+            # For WebSocket connections, return a 401 immediately
+            return Response(status_code=HTTP_401_UNAUTHORIZED, headers=headers)
+        
+        # For regular HTTP requests, return a 401 with a message
+        return Response(
+            content="Unauthorized. Authentication required.",
+            status_code=HTTP_401_UNAUTHORIZED,
+            headers=headers
+        )
 
 llm_client = openai.OpenAI(
     base_url="https://openrouter.ai/api/v1",
@@ -16,6 +74,9 @@ llm_client = openai.OpenAI(
 )
 
 app = FastAPI()
+
+# Add Basic Auth middleware
+app.add_middleware(BasicAuthMiddleware)
 
 # Mount static files directory
 app.mount("/static", StaticFiles(directory="static"), name="static")

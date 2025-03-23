@@ -119,8 +119,9 @@ function updateVisualizer() {
 function startStreaming() {
     if (isRecording) return;
     
-    // Create WebSocket connection
-    ws = new WebSocket(`ws://${window.location.host}/ws`);
+    // Create WebSocket connection with protocol matching page protocol (ws or wss)
+    const wsProtocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
+    ws = new WebSocket(`${wsProtocol}//${window.location.host}/ws`);
     
     ws.onopen = function() {
         // Request audio permissions
