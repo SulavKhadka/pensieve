@@ -1,23 +1,28 @@
 import re
+import json
 
-def generate_report_from_outline(llm_client, transcript_text, outline):
+def generate_report_from_outline(llm_client, transcript_text, outline, article_style):
     report_prompt = """
-    You are given a transcript where the user has brain dumped their thoughts.
-    Your task is to generate an article based on the transcript. You'll be given an outline of the article you will be generating.
+    You are given:
+    - a transcript where the user has brain dumped their thoughts.
+    - user specified content style that you will be following.
+    - an outline of the content you will be generating.
+    
+    Your task is to generate a well organized and cohesive content/article based on the transcript.
 
     Rules:
-    - You are only generating an article based on the transcript, not adding or changing views.
-    - Remember to follow the outline you are given. Use the article as a guide to generate a proper article that fully catalogs and organizes the users brain dump.
+    - You are only organizing and structuring the user's thoughts into the requested content style based on the transcript, not adding or changing views.
+    - Remember to follow the outline you are given. Use the outline as a guide to generate a proper output that fully catalogs and organizes the users brain dump in the requested content style.
     - Be faithful in translating the users thoughts and ideas. It is very important to not change/inject views.
-    - The outline is to show you the flow of the article. you dont have to write in bullet points with headers.
-    - Always follow best practices for writing articles. Use varying sentence structures and paragraphs.
-    - Use proper grammar and spelling and punctuation.
+    - The outline is to show you the flow of the content you will be generating. Use it as a flexible guide to help you create writing that is well structured and organized in the requested content style.
+    - Dont blindly follow the outline, use your judgement to help you create writing that is well structured and organized in the requested content style. 
+    - The outline will always have heading tags and lists, but your output should not have any heading tags or lists unless the is in line with the requested content style.
+    - Always follow best practices for writing. It is very important to follow the user provided content style to generate the final output.
 
 
     Output format:
-    - Output a markdown codeblock with ```markdown\n<article_content>\n```
-    - The article will be parsed by grabbing the content between the `````` tags.
-    - The article should be wellformatted markdown.
+    - Output a markdown codeblock with ```\n<article_content_goes_here>\n```
+    - The generated content will be parsed by grabbing the content between the ``` ``` tags.
     """
 
     user_prompt = f"""
@@ -25,6 +30,11 @@ def generate_report_from_outline(llm_client, transcript_text, outline):
     <transcript>
     {transcript_text}
     </transcript>
+
+    Here is the requested content style:
+    <article_style>
+    {article_style}
+    </article_style>
     
     Here is the outline of the report you will be generating:
     <outline>
@@ -32,19 +42,25 @@ def generate_report_from_outline(llm_client, transcript_text, outline):
     </outline>
     """
 
+    messages = [
+        {"role": "system", "content": report_prompt},
+        {"role": "user", "content": user_prompt}
+    ]
     response = llm_client.chat.completions.create(
         model="google/gemini-2.0-flash-001",
-        messages=[
-            {"role": "system", "content": report_prompt},
-            {"role": "user", "content": user_prompt}
-        ]
+        messages=messages
     )
-
     report = response.choices[0].message.content
+    
+    print(json.dumps(messages, indent=2))
+    print("--"*50)
     print(report)
-    report_match = re.search(r'```markdown\n(.*?)\n```', report, re.DOTALL)
+    
+    report_match = re.search(r'```\s*(.*?)\s*```', report, re.DOTALL)
     if report_match:
         report = report_match.group(1).strip()
+    else:
+        print("No report found between ``` tags")
     return {"report": report}
 
 
@@ -62,7 +78,10 @@ def outline_report(llm_client, transcript_text, article_style):
     - Use <thinking> tags to talk through the process of analyzing, grouping, and structuring the users thoughts.
 
     Output format:
-    - Output a markdown codeblock with ```<outline_content_goes_here>```
+    - Output the outline in a codeblock with ```\n<outline_content_goes_here>\n```
+    - The outline must always be in well formatted markdown between ``` ``` tags
+    - the thinking tags must be outside the ``` ``` tags
+
     """
 
     response = llm_client.chat.completions.create(
@@ -74,9 +93,11 @@ def outline_report(llm_client, transcript_text, article_style):
     )
     outline = response.choices[0].message.content
     print(outline)
-    outline_match = re.search(r'```\n(.*?)\n```', outline, re.DOTALL)
+    outline_match = re.search(r'```\s*(.*?)\s*```', outline, re.DOTALL)
     if outline_match:
         outline = outline_match.group(1).strip()
+    else:
+        print("No outline found between ``` tags")
     return {"outline": outline}
 
 if __name__ == "__main__":
