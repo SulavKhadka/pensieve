@@ -340,7 +340,10 @@ async function generateReport() {
     reportContent.innerHTML = 'Generating final report...';
     
     try {
-        const outline = outlineContent.innerText;
+        // Get the edited outline content - look for the editable div first
+        const editableOutline = outlineContent.querySelector('.editable-outline');
+        const outline = editableOutline ? editableOutline.innerHTML : outlineContent.innerHTML;
+        
         reportContent.innerHTML = 'Generating final report...';
         
         // Then generate the report using the outline
@@ -351,7 +354,8 @@ async function generateReport() {
             },
             body: JSON.stringify({
                 transcript: text,
-                outline: outline
+                outline: outline,
+                articleStyle: customStyle.value,
             })
         });
         
@@ -431,7 +435,13 @@ async function generateOutline() {
         }
         
         const outline = await response.json();
-        outlineContent.innerHTML = marked.parse(outline.outline);
+        
+        // Create an editable div with the outline content
+        outlineContent.innerHTML = `
+            <div class="editable-outline" contenteditable="true">${marked.parse(outline.outline)}</div>
+            <div class="outline-edit-hint">You can edit this outline before generating the report</div>
+        `;
+        
         hasOutline = true;
         
         // Switch to outline tab
@@ -440,7 +450,7 @@ async function generateOutline() {
         document.querySelector(`.tab-content[data-content="outline"]`).classList.add('active');
         document.querySelector(`.tab-content[data-content="report"]`).classList.remove('active');
         
-        showToast('Outline generated successfully', 'success');
+        showToast('Outline generated successfully. You can now edit it.', 'success');
         
     } catch (error) {
         console.error('Error generating outline:', error);

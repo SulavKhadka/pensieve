@@ -802,6 +802,62 @@ header {
     box-sizing: content-box;
 }
 
+/* Editable outline styles */
+.editable-outline {
+    min-height: 100px;
+    padding: 10px;
+    border: 1px dashed var(--gray);
+    border-radius: var(--radius);
+    background-color: rgba(236, 240, 241, 0.3);
+    transition: var(--transition);
+    cursor: text;
+    outline: none;
+}
+
+.editable-outline:hover {
+    border-color: var(--primary);
+    background-color: rgba(236, 240, 241, 0.5);
+}
+
+.editable-outline:focus {
+    border-color: var(--primary);
+    border-style: solid;
+    background-color: var(--white);
+    box-shadow: 0 0 0 2px rgba(52, 152, 219, 0.2);
+}
+
+.outline-edit-hint {
+    margin-top: 10px;
+    font-size: 0.85rem;
+    color: var(--gray);
+    font-style: italic;
+    text-align: center;
+}
+
+/* Make sure the markdown content in the editable outline is properly styled */
+.editable-outline h1, 
+.editable-outline h2, 
+.editable-outline h3, 
+.editable-outline h4, 
+.editable-outline h5, 
+.editable-outline h6 {
+    margin-top: 0.5em;
+    margin-bottom: 0.5em;
+}
+
+.editable-outline ul, 
+.editable-outline ol {
+    padding-left: 1.5em;
+}
+
+.editable-outline li {
+    margin-bottom: 0.25em;
+}
+
+.editable-outline p {
+    margin-bottom: 0.5em;
+}
+
 /* Responsive breakpoints */
 @media (max-width: 992px) {
     .app-container {
