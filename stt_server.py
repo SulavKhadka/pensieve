@@ -2,6 +2,7 @@ from fastapi import FastAPI, WebSocket, Request
 from fastapi.responses import HTMLResponse
 from fastapi.staticfiles import StaticFiles
 from whisper_streamer.whisper_online import *
+import json
 import numpy as np
 import time
 import openai
@@ -286,7 +287,10 @@ async def get_html():
 @app.post("/generate_outline")
 async def generate_outline(request: Request):
     transcript_data = await request.json()
-    outline = outline_report(llm_client, transcript_data["transcript"])
+    print(json.dumps(transcript_data, indent=4))
+    article_style = transcript_data.get("articleStyle", "default")
+
+    outline = outline_report(llm_client, transcript_data["transcript"], article_style)
     return outline
 
 @app.post("/generate_report")

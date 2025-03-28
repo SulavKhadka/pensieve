@@ -48,29 +48,36 @@ def generate_report_from_outline(llm_client, transcript_text, outline):
     return {"report": report}
 
 
-def outline_report(llm_client, transcript_text):
+def outline_report(llm_client, transcript_text, article_style):
 
     outline_prompt = """
-    You are given a transcript where the user has braindumped their thoughts.
-    Your job is to identify the main points and come up with a outline for a report.
+    You are given a transcript where the user has braindumped their thoughts. Your job is to identify the main points and come up with a outline for structuring and organizing the users thoughts into the form they want. You will be given the format style that the user has specified for the final article that you will need to use in creating the outline.
+    
     How to do this:
     - Identify the topics that the user is talking about
-    - Group the topics into sections
+    - Carefully consider what the final content the user wants to generate
+    - Group the topics into sections that fits the requested content style
     - Think about how the overall article should flow depending on the topics, their relationships, and how much and what is said about them
-    - You are only organizing and adding cohesiveness to the users braindump, not adding or changing views.
+    - You are only organizing and adding cohesiveness to the users braindump in the requested content style, not adding or changing views.
+    - Use <thinking> tags to talk through the process of analyzing, grouping, and structuring the users thoughts.
 
     Output format:
-    - Output a markdown codeblock with ```<outline_content>```
+    - Output a markdown codeblock with ```<outline_content_goes_here>```
     """
 
     response = llm_client.chat.completions.create(
         model="google/gemini-2.0-flash-001",
         messages=[
             {"role": "system", "content": outline_prompt},
-            {"role": "user", "content": transcript_text}
+            {"role": "user", "content": f"<transcript>\n{transcript_text}\n</transcript>\n\nRequested content style: {article_style}"}
         ]
     )
-    return {"outline": response.choices[0].message.content}
+    outline = response.choices[0].message.content
+    print(outline)
+    outline_match = re.search(r'```\n(.*?)\n```', outline, re.DOTALL)
+    if outline_match:
+        outline = outline_match.group(1).strip()
+    return {"outline": outline}
 
 if __name__ == "__main__":
     print("No good")

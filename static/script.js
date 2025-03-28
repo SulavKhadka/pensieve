@@ -15,6 +15,8 @@ const settingsModal = document.getElementById('settingsModal');
 const toast = document.getElementById('toast');
 const toastMessage = document.getElementById('toastMessage');
 const transcript = document.getElementById('transcript');
+const articleStyle = document.getElementById('articleStyle');
+const customStyle = document.getElementById('customStyle');
 const reportContent = document.getElementById('reportContent');
 const outlineContent = document.getElementById('outlineContent');
 const recordingIndicator = document.getElementById('recordingIndicator');
@@ -52,6 +54,17 @@ let settings = {
     transcriptionModel: 'distil-large-v3',
     reportModel: 'google/gemini-2.0-flash-001',
     reportType: 'summary'
+};
+
+// Style descriptions for different report styles
+const styleDescriptions = {
+    'academic': 'Formal, structured writing with citations, technical terminology, and evidence-based arguments. Suitable for research papers and scholarly articles.',
+    'business': 'Clear, concise, and action-oriented with executive summaries, data-driven insights, and professional tone. Ideal for business reports and proposals.',
+    'creative': 'Expressive, imaginative writing with vivid descriptions, narrative elements, and engaging storytelling techniques.',
+    'journalistic': 'Objective, fact-based reporting with clear headlines, concise paragraphs, and the inverted pyramid structure (most important information first).',
+    'technical': 'Precise, detailed explanations with specialized terminology, step-by-step instructions, and diagrams or code examples where appropriate.',
+    'narrative': 'Story-driven approach with character development, plot progression, and descriptive scenes that engage the reader emotionally.',
+    'blog': 'Conversational, accessible tone with personal insights, practical advice, and engaging headings. Often includes lists and actionable takeaways.'
 };
 
 // Load settings from localStorage if available
@@ -380,54 +393,60 @@ async function generateReport() {
 
 // Generate Outline
 async function generateOutline() {
-    document.querySelector('.tab[data-tab="report"]').classList.remove('active');
-    document.querySelector(`.tab-content[data-content="report"]`).classList.remove('active');
-
-    document.querySelector('.tab[data-tab="outline"]').classList.add('active');
-    document.querySelector(`.tab-content[data-content="outline"]`).classList.add('active');
-
     const text = transcript.innerText;
     if (!text.trim()) {
         showToast('No transcript to generate outline from', 'error');
         return;
     }
     
+    // Get the selected style or custom style
+    let selectedStyle = articleStyle.value;
+    if (customStyle.value.trim()) {
+        selectedStyle = customStyle.value.trim();
+    }
+    
     // Set loading state
     generateOutlineButton.disabled = true;
     generateOutlineButton.innerHTML = '<div class="spinner"></div>';
     outlineContent.innerHTML = 'Generating outline...';
-    generateReportButton.disabled = true; // Disable report button during outline generation
     
+    console.log(articleStyle.value);
+    console.log(customStyle.value);
+
     try {
-        // First generate the outline
-        const outlineResponse = await fetch(`${window.location.protocol}//${window.location.host}/generate_outline`, {
+        // Make API call to generate outline
+        const response = await fetch(`${window.location.protocol}//${window.location.host}/generate_outline`, {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json',
             },
             body: JSON.stringify({
-                transcript: text
+                transcript: text,
+                articleStyle: customStyle.value
             })
         });
         
-        if (!outlineResponse.ok) {
+        if (!response.ok) {
             throw new Error('Failed to generate outline');
         }
         
-        const outline_content = await outlineResponse.json();
-        console.log(outline_content.outline);
-        outlineContent.innerHTML = marked.parse(outline_content.outline);
-        outlineContent.setAttribute('contenteditable', 'true');
+        const outline = await response.json();
+        outlineContent.innerHTML = marked.parse(outline.outline);
+        hasOutline = true;
+        
+        // Switch to outline tab
+        document.querySelector('.tab[data-tab="outline"]').classList.add('active');
+        document.querySelector('.tab[data-tab="report"]').classList.remove('active');
+        document.querySelector(`.tab-content[data-content="outline"]`).classList.add('active');
+        document.querySelector(`.tab-content[data-content="report"]`).classList.remove('active');
+        
         showToast('Outline generated successfully', 'success');
-        hasOutline = true; // Set outline state to true
-        generateReportButton.disabled = false; // Enable report button after successful outline generation
         
     } catch (error) {
         console.error('Error generating outline:', error);
         outlineContent.innerHTML = 'Error generating outline. Please try again.';
         showToast('Failed to generate outline', 'error');
-        hasOutline = false; // Reset outline state on error
-        generateReportButton.disabled = true; // Keep report button disabled on error
+        
     } finally {
         // Reset button state
         generateOutlineButton.disabled = false;
@@ -496,12 +515,7 @@ initVisualizer();
 // Load saved settings
 loadSettings();
 
-// Initialize UI state
-generateReportButton.disabled = true; // Initially disable report button until outline is generated
-copyReportButton.disabled = true; // Initially disable copy button until report is generated
-downloadReportButton.disabled = true; // Initially disable download button until report is generated
-
-// Event Listeners
+// Event listeners
 startButton.addEventListener('click', startStreaming);
 stopButton.addEventListener('click', stopStreaming);
 clearButton.addEventListener('click', clearTranscript);
@@ -520,14 +534,7 @@ closeModalBtn.addEventListener('click', () => {
     settingsModal.style.display = 'none';
 });
 
-saveSettingsBtn.addEventListener('click', () => {
-    // Update settings object
-    settings.language = document.getElementById('languageSelect').value;
-    settings.transcriptionModel = document.getElementById('modelSelect').value;
-    settings.reportModel = document.getElementById('reportModelSelect').value;
-    
-    saveSettings();
-});
+saveSettingsBtn.addEventListener('click', saveSettings);
 
 // Report type selection
 reportTypeOptions.forEach(option => {
@@ -540,7 +547,29 @@ reportTypeOptions.forEach(option => {
         
         // Update settings
         settings.reportType = option.dataset.type;
-        saveSettings();
+    });
+});
+
+// Style selector event listener
+articleStyle.addEventListener('change', () => {
+    const selectedStyle = articleStyle.value;
+    customStyle.value = styleDescriptions[selectedStyle] || 'Select a style to see its description.';
+});
+
+// Initialize style description
+customStyle.value = styleDescriptions[articleStyle.value] || 'Select a style to see its description.';
+
+// Tab switching
+tabs.forEach(tab => {
+    tab.addEventListener('click', () => {
+        // Remove active class from all tabs and contents
+        tabs.forEach(t => t.classList.remove('active'));
+        tabContents.forEach(content => content.classList.remove('active'));
+        
+        // Add active class to clicked tab and corresponding content
+        tab.classList.add('active');
+        const tabName = tab.dataset.tab;
+        document.querySelector(`.tab-content[data-content="${tabName}"]`).classList.add('active');
     });
 });
 
@@ -550,6 +579,10 @@ window.addEventListener('click', (event) => {
         settingsModal.style.display = 'none';
     }
 });
+
+// Disable copy and download buttons initially
+copyReportButton.disabled = true;
+downloadReportButton.disabled = true;
 
 // Handle page unload
 window.addEventListener('beforeunload', () => {

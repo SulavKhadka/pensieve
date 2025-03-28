@@ -113,7 +113,30 @@ header {
     }
 }
 
-.transcript-panel, .report-panel {
+/* Left panel container for transcript and style panels */
+.left-panel-container {
+    display: flex;
+    flex-direction: column;
+    flex: 1;
+    gap: 1rem;
+    max-height: calc(100vh - 150px);
+}
+
+.transcript-panel {
+    flex: 6; /* 70% of the vertical space */
+    display: flex;
+    flex-direction: column;
+    min-height: 0;
+}
+
+.style-panel {
+    flex: 4; /* 30% of the vertical space */
+    display: flex;
+    flex-direction: column;
+    min-height: 0;
+}
+
+.report-panel {
     flex: 1;
     display: flex;
     flex-direction: column;
@@ -815,4 +838,37 @@ header {
     .btn svg {
         display: none;
     }
+}
+
+/* Style panel specific styles */
+.style-input-container {
+    display: flex;
+    flex-direction: column;
+    gap: 1rem;
+    padding: 0.5rem;
+}
+
+.style-input-container label {
+    font-weight: 500;
+    color: var(--dark);
+    margin-bottom: 0.25rem;
+}
+
+.style-description {
+    background-color: rgba(52, 152, 219, 0.05);
+    border: 1px solid rgba(52, 152, 219, 0.1);
+    border-radius: var(--radius);
+    padding: 0.75rem;
+    margin-top: 0.5rem;
+    font-size: 0.9rem;
+    color: var(--dark);
+}
+
+.custom-style-container {
+    margin-top: 0.5rem;
+}
+
+.custom-style-container textarea {
+    min-height: 80px;
+    resize: vertical;
 }
