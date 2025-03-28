@@ -296,7 +296,9 @@ async def generate_outline(request: Request):
 @app.post("/generate_report")
 async def generate_report(request: Request):
     transcript_data = await request.json()
-    report = generate_report_from_outline(llm_client, transcript_data["transcript"], transcript_data["outline"])
+    print(json.dumps(transcript_data, indent=4))
+    article_style = transcript_data.get("articleStyle", "default")
+    report = generate_report_from_outline(llm_client, transcript_data["transcript"], transcript_data["outline"], article_style)
     return report
 
 @app.websocket("/ws")
